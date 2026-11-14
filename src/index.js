@@ -11,7 +11,7 @@ import routes from "./routes/taskRoutes.js";
 // creating the server instance
 const app = express();
 app.set("trust proxy", 1);
-const PORT = process.env.PORT || 8080;
+
 const MONGO_URI = process.env.MONGO_URI;
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN;
 
