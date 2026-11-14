@@ -18,16 +18,36 @@ app.use(helmet());
 app.use(cors({ origin: CLIENT_ORIGIN }));
 app.use(express.json({ limit: "10kb" }));
 app.use(morgan("dev"));
+
+// Health check
+app.get("/", (req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Backend is running"
+    });
+});
+
+app.use(async (req, res, next) => {
+    try {
+        if (!MONGO_URI) {
+            throw new Error("MONGO_URI is not configured");
+        }
+
+        await connectDB(MONGO_URI);
+        next();
+    } catch (error) {
+        logger.error(`Database connection failed: ${error.message}`);
+
+        res.status(503).json({
+            success: false,
+            message: "Database connection failed"
+        });
+    }
+});
+
 app.use("/api", rateLimit({ windowMs: 60_000, limit: 50 }));
 app.use("/api/tasks", routes);
 
-connectDB(MONGO_URI)
-    .then(() => {
-        app.listen(PORT, () => logger.info(`Server listening on ${PORT}`));
-    })
-    .catch((error) => {
-        logger.error(`Failed to start server: ${error.message}`);
-        process.exit(1);
-    });
+export default app;
 
 
