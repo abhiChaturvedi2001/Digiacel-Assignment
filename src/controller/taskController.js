@@ -1,26 +1,31 @@
 import Task from "../model/taskSchema.js";
 import { ApiError } from "../utils/ApiError.js";
-import { DATE_RE, dateStringToInt, escapeRegex, toClientFormat, toDbFormat } from "../utils/constant.js";
+import { dateStringToInt, escapeRegex, toClientFormat, toDbFormat } from "../utils/constant.js";
+
+// Upper bounds so a single request can never pull an unbounded number of documents.
+const SEARCH_LIMIT = 50;
+const LIST_LIMIT = 1000;
+
+const UPDATE_OPTIONS = { returnDocument: "after", runValidators: true, lean: true };
+
+// Bodies and queries are already validated and normalised by the zod schemas in routes.
 
 export const getTasks = async (req, res) => {
-    const { from, to, search } = req.query;
+    const { from, to, search } = res.locals.query;
     const filter = {};
 
-    if (from || to) {
-        if (!DATE_RE.test(from || "") || !DATE_RE.test(to || "")) {
-            throw ApiError.badRequest("from and to must both be dates like 2026-11-15");
-        }
+    if (from && to) {
         filter.date = { $gte: dateStringToInt(from), $lte: dateStringToInt(to) };
     }
 
-    if (search && search.trim()) {
-        const searchRegex = new RegExp(escapeRegex(search.trim()), "i");
+    if (search) {
+        const searchRegex = new RegExp(escapeRegex(search), "i");
         filter.$or = [{ title: searchRegex }, { description: searchRegex }];
     }
 
     const tasks = await Task.find(filter)
         .sort({ date: 1, startTime: 1 })
-        .limit(search ? 50 : 0)
+        .limit(search ? SEARCH_LIMIT : LIST_LIMIT)
         .lean();
 
     res.json(tasks.map(toClientFormat));
@@ -32,11 +37,7 @@ export const createTask = async (req, res) => {
 };
 
 export const updateTask = async (req, res) => {
-    const task = await Task.findByIdAndUpdate(req.params.id, toDbFormat(req.body), {
-        new: true,
-        runValidators: true,
-        lean: true,
-    });
+    const task = await Task.findByIdAndUpdate(req.params.id, toDbFormat(req.body), UPDATE_OPTIONS);
 
     if (!task) {
         throw ApiError.notFound("Task not found");
@@ -46,11 +47,7 @@ export const updateTask = async (req, res) => {
 };
 
 export const updateTaskStatus = async (req, res) => {
-    const task = await Task.findByIdAndUpdate(
-        req.params.id,
-        { status: req.body.status },
-        { new: true, runValidators: true, lean: true }
-    );
+    const task = await Task.findByIdAndUpdate(req.params.id, { status: req.body.status }, UPDATE_OPTIONS);
 
     if (!task) {
         throw ApiError.notFound("Task not found");

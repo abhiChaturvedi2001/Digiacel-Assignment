@@ -1,15 +1,11 @@
-import { ApiError } from "./ApiError.js";
+// Converters between the API format and the storage format.
+//   API: date "YYYY-MM-DD", times "HH:mm" (endTime may be "")
+//   DB:  date YYYYMMDD number, times as minutes since midnight (endTime may be null)
+// Inputs are validated by the zod schemas before they reach these helpers.
 
-export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 export const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-export const dateStringToInt = (dateStr) => {
-    if (!dateStr) {
-        throw ApiError.badRequest("Date is required");
-    }
-    const [year, month, day] = dateStr.split("-");
-    return Number(`${year}${month}${day}`);
-};
+export const dateStringToInt = (dateStr) => Number(dateStr.replaceAll("-", ""));
 
 export const dateIntToString = (dateInt) => {
     const s = String(dateInt);
@@ -17,9 +13,6 @@ export const dateIntToString = (dateInt) => {
 };
 
 export const timeStringToMinutes = (timeStr) => {
-    if (!timeStr) {
-        throw ApiError.badRequest("Time is required");
-    }
     const [hour, minute] = timeStr.split(":").map(Number);
     return hour * 60 + minute;
 };
@@ -42,11 +35,9 @@ export const toDbFormat = (payload) => {
     return data;
 };
 
-export const toClientFormat = (task) => {
-    return {
-        ...task,
-        date: dateIntToString(task.date),
-        startTime: minutesToTimeString(task.startTime),
-        endTime: task.endTime == null ? "" : minutesToTimeString(task.endTime),
-    };
-};
+export const toClientFormat = (task) => ({
+    ...task,
+    date: dateIntToString(task.date),
+    startTime: minutesToTimeString(task.startTime),
+    endTime: task.endTime == null ? "" : minutesToTimeString(task.endTime),
+});
